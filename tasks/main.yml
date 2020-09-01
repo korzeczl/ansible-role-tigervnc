@@ -1,0 +1,73 @@
+---
+# tasks file for provisioning/roles/tigervnc
+
+# tasks file for tigervnc
+- name: include assert.yml
+  include_tasks: assert.yml
+
+- name: Install Tiger VNC server
+  yum:
+    name: "tigervnc-server"
+    state: present
+#  register: tigervnc_install_software
+#
+#- name: debug the var
+#  debug:
+#    var: tigervnc_install_software
+
+- name: create .vnc directory
+  file:
+    path: /home/{{ tigervnc_username }}/.vnc
+    owner: "{{ tigervnc_username }}"
+    group: "{{ tigervnc_groupname }}"
+    state: directory
+    mode: "755"
+
+- name: generate vnc password
+  shell: set -o pipefail ; printf "{{ tigervnc_password }}\n{{ tigervnc_password }}\n" | vncpasswd
+  args:
+    creates: /home/{{ tigervnc_username }}/.vnc/passwd
+    executable: /bin/bash
+  become: yes
+  become_user: "{{ tigervnc_username }}"
+  when:
+    - not tigervnc_user_exists
+
+- name: place config
+  template:
+    src: config
+    dest: "/home/{{ tigervnc_username }}/.vnc/config"
+    owner: "{{ tigervnc_username }}"
+    group: "{{ tigervnc_groupname }}"
+    mode: "644"
+  notify:
+    - restart tigervnc
+  when:
+    - tigervnc_user_exists
+
+- name: place xvncstartup
+  template:
+    src: xstartup
+    dest: "/home/{{ tigervnc_username }}/.vnc/xstartup"
+    owner: "{{ tigervnc_username }}"
+    group: "{{ tigervnc_groupname }}"
+    mode: "755"
+  notify:
+    - restart tigervnc
+
+- name: Set AuthentificationPAssword=ON for sshd [vagrant]
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    state: present
+    regexp: '^PasswordAuthentication no'
+    line: 'PasswordAuthentication yes'
+  notify:
+    - reload service sshd
+
+# https://github.com/TurboVNC/turbovnc/issues/207
+- name: Correct issue "Authentication is required to refresh the system repositories" dialog when launching GNOME 3 using TigerVNC
+  copy:
+    src: "{{ role_path }}/files/45-tigervnc-gnome3.pkla"
+    dest: /etc/polkit-1/localauthority/50-local.d/45-tigervnc-gnome3.pkla
+
+

@@ -1,0 +1,6 @@
+{{ ansible_managed | comment }}
+# securitytypes=vncauth,tlsvnc
+# desktop=sandbox
+geometry=1920x1080
+# localhost
+# alwaysshared
